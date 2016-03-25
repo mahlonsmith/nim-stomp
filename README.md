@@ -82,8 +82,8 @@ client.receipt_callback = accept_receipt
 client.connect
 
 var headers = seq[ tuple[name:string, value:string] ]
-headers.add( "x-breakfast", "tequila" )
-headers.add( "receipt", "special-identifier" )
+headers.add( ("x-breakfast", "tequila") )
+headers.add( ("receipt", "special-identifier") )
 
 client.send( "/destination", "message!", "text/plain", headers )
 ```
@@ -116,16 +116,16 @@ client.begin( "trans-2" )
 client.begin( "trans-3" )
 
 var headers = seq[ tuple[name:string, value:string] ]
-headers.add( "transaction", "trans-1" )
+headers.add( ("transaction", "trans-1") )
 client.send( "/destination", "hi", nil, headers ) # Part of "trans-1"
 
 headers = @[]
-headers.add( "transaction", "trans-2" )
+headers.add( ("transaction", "trans-2") )
 client.send( "/destination", "hi", nil, headers ) # Part of "trans-2"
 client.ack( "some-ack-id", "trans-2" ) # Part of "trans-2"
 
 headers = @[]
-headers.add( "transaction", "trans-3" )
+headers.add( ("transaction", "trans-3") )
 client.send( "/destination", "hi", nil, headers ) # Part of "trans-3"
 client.ack( "some-ack-id", "trans-3" ) # Part of "trans-3"
 
