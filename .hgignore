@@ -1,3 +1,5 @@
+syntax: glob
 .cache
-stomp$
-stomp.html
+stomp
+src/stomp
+*.html

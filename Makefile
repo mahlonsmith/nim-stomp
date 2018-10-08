@@ -1,11 +1,12 @@
 
-FILES = stomp.nim
+FILES = src/stomp.nim
 CACHE = .cache
 
 default: development
 
 development: ${FILES}
 	nim --debugInfo --assertions:on --linedir:on -d:ssl --define:debug --nimcache:${CACHE} c ${FILES}
+	@mv src/stomp .
 
 autobuild:
 	# find . -depth 1 -name \*.nim | entr -cp make
@@ -16,6 +17,7 @@ debugger: ${FILES}
 
 release: ${FILES}
 	nim -d:release --opt:speed --nimcache:${CACHE} c ${FILES}
+	@mv src/stomp .
 
 docs:
 	nim doc ${FILES}
