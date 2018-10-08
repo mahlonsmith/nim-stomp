@@ -1,6 +1,6 @@
 # vim: set et nosta sw=4 ts=4 ft=nim : 
 #
-# Copyright (c) 2016, Mahlon E. Smith <mahlon@martini.nu>
+# Copyright (c) 2016-2018, Mahlon E. Smith <mahlon@martini.nu>
 # All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -48,16 +48,6 @@
 ## This library has been tested with recent versions of RabbitMQ.  If it
 ## works for you with another broker, please let the author know.
 ##
-##
-## Protocol support
-## ----------------
-## 
-## Examples
-## =========
-##
-## Connecting with SSL
-## -------------------
-##
 
 import
     strutils,
@@ -68,7 +58,7 @@ import
     uri
 
 const
-    VERSION = "0.1.0" ## The current program version.
+    VERSION = "0.1.1" ## The current program version.
     NULL    = "\x00"  ## The NULL character.
     CR      = "\r"    ## The carriage return character.
     CRLF    = "\r\n"  ## Carriage return + Line feed (EOL).
@@ -218,7 +208,7 @@ proc newStompResponse( c: StompClient ): StompResponse =
     #
     if result.payload.len > 0:
         if result.payload == NULL: # We checked for a body, but there was none.
-            result.payload = nil
+            result.payload = ""
             if defined( debug ): printf " <--\n <-- ^@\n\n"
         else:
             if defined( debug ): printf " <--\n <-- (payload)^@\n\n"
@@ -240,7 +230,7 @@ proc `[]`*( response: StompResponse, key: string ): string =
     for header in response.headers:
         if cmpIgnoreCase( key, header.name ) == 0:
             return header.value
-    return nil
+    return ""
 
 
 #-------------------------------------------------------------------
@@ -349,19 +339,18 @@ proc finmsg( c: StompClient ): void =
 
 proc `[]`*( c: StompClient, key: string ): string =
     ## Get a specific value from the server metadata, set during the initial connection.
-    if not c.connected: return nil
+    if not c.connected: return ""
     for header in c.serverinfo:
         if cmpIgnoreCase( key, header.name ) == 0:
             return header.value
-    return nil
+    return ""
 
 
 proc `$`*( c: StompClient ): string =
     ## Represent the stomp client as a string, after masking the password.
     let uri = ( $c.uri ).replace( ":" & c.uri.password & "@", "@" )
     result = "(NimStomp v" & VERSION & ( if c.connected: " connected" else: " not connected" ) & " to " & uri
-    if not c[ "server" ].is_nil:
-        result.add( " --> " & c["server"] )
+    if not ( c[ "server" ] == "" ): result.add( " --> " & c["server"] )
     result.add( ")" )
 
 
@@ -428,8 +417,8 @@ proc add_txn( c: StompClient ): void =
 
 proc send*( c: StompClient,
             destination: string,
-            message:     string = nil,
-            contenttype: string = nil,
+            message:     string = "",
+            contenttype: string = "",
             headers:     seq[ tuple[name: string, value: string] ] = @[] ): void =
     ## Send a **message** to **destination**.
     ##
@@ -445,7 +434,7 @@ proc send*( c: StompClient,
     c.socksend( "SEND" & CRLF )
     c.socksend( "destination:" & destination & CRLF )
     c.socksend( "content-length:" & $message.len & CRLF )
-    if not contenttype.is_nil: c.socksend( "content-type:" & contenttype & CRLF )
+    if not ( contenttype == "" ): c.socksend( "content-type:" & contenttype & CRLF )
 
     # Add custom headers.  Add transaction header if one isn't manually
     # present (and a transaction is open.)
@@ -456,7 +445,7 @@ proc send*( c: StompClient,
         c.socksend( header.name & ":" & header.value & CRLF )
     if not txn_seen: c.add_txn
 
-    if message.is_nil:
+    if message == "":
         c.finmsg
     else:
         c.socket.send( CRLF & message & NULL )
@@ -526,11 +515,11 @@ proc begin*( c: StompClient, txn: string ): void =
     c.transactions.add( txn )
 
 
-proc commit*( c: StompClient, txn: string = nil ): void =
+proc commit*( c: StompClient, txn: string = "" ): void =
     ## Finish a specific transaction **txn**, or the most current if unspecified.
     var transaction = txn
-    if transaction.is_nil and c.transactions.len > 0: transaction = c.transactions.pop
-    if transaction.is_nil: return
+    if transaction == "" and c.transactions.len > 0: transaction = c.transactions.pop
+    if transaction == "": return
 
     c.socksend( "COMMIT" & CRLF )
     c.socksend( "transaction:" & transaction & CRLF )
@@ -544,11 +533,11 @@ proc commit*( c: StompClient, txn: string = nil ): void =
     c.transactions = new_transactions
 
 
-proc abort*( c: StompClient, txn: string = nil ): void =
+proc abort*( c: StompClient, txn: string = "" ): void =
     ## Cancel a specific transaction **txn**, or the most current if unspecified.
     var transaction = txn
-    if transaction.is_nil and c.transactions.len > 0: transaction = c.transactions.pop
-    if transaction.is_nil: return
+    if transaction == "" and c.transactions.len > 0: transaction = c.transactions.pop
+    if transaction == "": return
 
     c.socksend( "ABORT" & CRLF )
     c.socksend( "transaction:" & transaction & CRLF )
@@ -562,20 +551,20 @@ proc abort*( c: StompClient, txn: string = nil ): void =
     c.transactions = new_transactions
 
 
-proc ack*( c: StompClient, id: string, transaction: string = nil ): void =
+proc ack*( c: StompClient, id: string, transaction: string = "" ): void =
     ## Acknowledge message **id**.  Optionally, attach this acknowledgement
     ## to a specific **transaction** -- if there's only one active, it is
     ## added automatically.
     c.socksend( "ACK" & CRLF )
     c.socksend( "id:" & id & CRLF )
-    if not transaction.is_nil:
+    if not ( transaction == "" ):
         c.socksend( "transaction:" & transaction & CRLF )
     else:
         c.add_txn
     c.finmsg
 
 
-proc nack*( c: StompClient, id: string, transaction: string = nil ): void =
+proc nack*( c: StompClient, id: string, transaction: string = "" ): void =
     ## Reject message **id**.  Optionally, attach this rejection to a
     ## specific **transaction** -- if there's only one active, it is
     ## added automatically.
@@ -591,7 +580,7 @@ proc nack*( c: StompClient, id: string, transaction: string = nil ): void =
     ##
     c.socksend( "NACK" & CRLF )
     c.socksend( "id:" & id & CRLF )
-    if not transaction.is_nil:
+    if not ( transaction == "" ):
         c.socksend( "transaction:" & transaction & CRLF )
     else:
         c.add_txn
@@ -618,7 +607,7 @@ proc wait_for_messages*( c: StompClient, loop=true ) =
         else:
             timeout = -1
 
-        if select( fds, timeout ) == 0: # timeout, only happens if heartbeating missed
+        if select_read( fds, timeout ) == 0: # timeout, only happens if heartbeating missed
             if not isNil( c.missed_heartbeat_callback ):
                 c.missed_heartbeat_callback( c )
             else:
@@ -688,7 +677,29 @@ when isMainModule:
         socket   = newSocket()
         messages: seq[ StompResponse ] = @[]
 
-    if paramCount() != 3: quit "See source comments for how to run functional tests."
+    let usage = """
+First start up a message receiver:
+  ./stomp receiver [stomp-uri] [subscription-destination]
+
+then run another process, to publish stuff:
+  ./stomp publisher [stomp-uri] [publish-destination]
+
+An example with an AMQP "direct" exchange, and an exclusive queue:
+  ./stomp publisher stomp://test:test@localhost/?heartbeat=10 /exchange/test
+  ./stomp receiver  stomp://test:test@localhost/?heartbeat=10 /exchange/test
+
+Then just let 'er run.
+
+You can also run a nieve benchmark (deliveries/sec):
+
+  ./stomp benchmark stomp://test:test@localhost/ /exchange/test
+
+It will set messages to require acknowledgement, and nack everything, causing
+a delivery loop for 10 seconds.
+"""
+
+
+    if paramCount() != 3: quit usage
 
     var stomp = newStompClient( socket, paramStr(2) )
     stomp.connect
@@ -709,7 +720,7 @@ when isMainModule:
             stomp.message_callback = incr
             stomp.subscribe( paramStr(3), "client" )
             stomp.send( paramStr(3), "hi." )
-            while get_time() - start < 10:
+            while get_time() < start + 10.seconds:
                 stomp.wait_for_messages( false )
 
             printf "* Processed %d messages in 10 seconds.\n", count
@@ -745,7 +756,7 @@ when isMainModule:
             # Assertions on the results!
             #
             doAssert( messages.len == expected )
-            doAssert( messages[0].payload == nil )
+            doAssert( messages[0].payload == "" )
 
             doAssert( messages[1].payload == "Hello world!" )
 
@@ -829,7 +840,7 @@ when isMainModule:
                 headers = @[]
                 headers.add( ("transaction", "test-" & $i ) )
                 stomp.begin( "test-" & $i )
-                stomp.send( paramStr(3), "transaction " & $i, nil, headers )
+                stomp.send( paramStr(3), "transaction " & $i, "", headers )
                 sleep 500
             stomp.abort( "test-1" )
             sleep 500
@@ -842,6 +853,5 @@ when isMainModule:
             echo "* Tests passed!"
 
         else:
-            quit "See source comments for how to run functional tests."
-
+            quit usage
 
