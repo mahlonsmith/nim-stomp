@@ -281,14 +281,19 @@ proc newStompClient*( s: Socket, uri: string ): StompClient =
     ##    sslContext.wrapSocket(socket)
     ##    var stomp = newStompClient( socket, "stomp+ssl://test:test@example.com/%2Fvhost" )
     ##
+
+    let
+        uri   = parse_uri( uri )
+        vhost = if uri.path.len > 1: uri.path.strip( chars = {'/'}, trailing = false ) else: uri.path
+
     new( result )
     result.socket        = s
     result.connected     = false
-    result.uri           = parse_uri( uri )
-    result.username      = result.uri.username
-    result.password      = result.uri.password
-    result.host          = result.uri.hostname
-    result.vhost         = result.uri.path
+    result.uri           = uri
+    result.username      = uri.username
+    result.password      = uri.password
+    result.host          = uri.hostname
+    result.vhost         = vhost
     result.timeout       = 500
     result.subscriptions = @[]
     result.transactions  = @[]
@@ -455,7 +460,8 @@ proc send*( c: StompClient,
 proc subscribe*( c: StompClient,
             destination: string,
             ack        = "auto",
-            headers:     seq[ tuple[name: string, value: string] ] = @[] ): void =
+            id:        string = "",
+            headers:   seq[ tuple[name: string, value: string] ] = @[] ): void =
     ## Subscribe to messages at **destination**.
     ##
     ## Setting **ack** to "client" or "client-individual" enables client ACK/NACK mode.
@@ -468,7 +474,12 @@ proc subscribe*( c: StompClient,
     if not c.connected: raise newException( StompError, "Client is not connected." )
     c.socksend( "SUBSCRIBE" & CRLF )
     c.socksend( "destination:" & destination & CRLF )
-    c.socksend( "id:" & $c.subscriptions.len & CRLF )
+
+    if id == "":
+        c.socksend( "id:" & $c.subscriptions.len & CRLF )
+    else:
+        c.socksend( "id:" & id & CRLF )
+
     if ack == "client" or ack == "client-individual":
         c.socksend( "ack:" & ack & CRLF )
     else:
@@ -659,14 +670,14 @@ proc wait_for_messages*( c: StompClient, loop=true ) =
 #   ./stomp publisher [stomp-uri] [publish-destination]
 #
 # An example with an AMQP "direct" exchange, and an exclusive queue:
-#   ./stomp publisher stomp://test:test@localhost/?heartbeat=10 /exchange/test
-#   ./stomp receiver  stomp://test:test@localhost/?heartbeat=10 /exchange/test
+#   ./stomp publisher stomp://test:test@localhost/%2F?heartbeat=10 /exchange/test
+#   ./stomp receiver  stomp://test:test@localhost/%2F?heartbeat=10 /exchange/test
 #
 # Then just let 'er run.
 #
-# You can also run a nieve benchmark (deliveries/sec):
+# You can also run a naive benchmark (deliveries/sec):
 #
-#   ./stomp benchmark stomp://test:test@localhost/ /exchange/test
+#   ./stomp benchmark stomp://test:test@localhost%2F /exchange/test
 #
 # It will set messages to require acknowledgement, and nack everything, causing
 # a delivery loop for 10 seconds.
@@ -685,17 +696,18 @@ then run another process, to publish stuff:
   ./stomp publisher [stomp-uri] [publish-destination]
 
 An example with an AMQP "direct" exchange, and an exclusive queue:
-  ./stomp publisher stomp://test:test@localhost/?heartbeat=10 /exchange/test
-  ./stomp receiver  stomp://test:test@localhost/?heartbeat=10 /exchange/test
+  ./stomp publisher stomp://test:test@localhost/%2F?heartbeat=10 /exchange/test
+  ./stomp receiver  stomp://test:test@localhost/%2F?heartbeat=10 /exchange/test
 
 Then just let 'er run.
 
-You can also run a nieve benchmark (deliveries/sec):
+You can also run a naive benchmark (deliveries/sec):
 
-  ./stomp benchmark stomp://test:test@localhost/ /exchange/test
+  ./stomp benchmark stomp://test:test@localhost/%2F /exchange/test
 
 It will set messages to require acknowledgement, and nack everything, causing
 a delivery loop for 10 seconds.
+If your vhost requires slashes, use URI escaping: /%2Ftest
 """
 
 
