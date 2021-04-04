@@ -1,6 +1,6 @@
 # vim: set et nosta sw=4 ts=4 ft=nim : 
 #
-# Copyright (c) 2016-2019, Mahlon E. Smith <mahlon@martini.nu>
+# Copyright (c) 2016-2021, Mahlon E. Smith <mahlon@martini.nu>
 # All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -100,6 +100,17 @@ type
 
 # convenience
 proc printf( formatstr: cstring ) {.header: "<stdio.h>", varargs.}
+
+
+proc encode( str: string ): string =
+    ## Encode value value strings per the "Value Encoding" section
+    ## of the Stomp 1.2 spec.
+    result = str
+    result = result.
+        replace( "\r", "\\r" ).
+        replace( "\n", "\\n" ).
+        replace( "\\", "\\\\" ).
+        replace( ":", "\\c" )
 
 
 #-------------------------------------------------------------------
@@ -270,7 +281,7 @@ proc newStompClient*( s: Socket, uri: string ): StompClient =
     ## .. code-block:: nim
     ##
     ##    var socket = newSocket()
-    ##    var stomp  = newStompClient( socket, "stomp://test:test@example.com/%2Fvhost" )
+    ##    var stomp  = newStompClient( socket, "stomp://test:test@example.com/vhost" )
     ##
     ## or if connecting with SSL, when compiled with -d:ssl:
     ##
@@ -279,7 +290,7 @@ proc newStompClient*( s: Socket, uri: string ): StompClient =
     ##    var socket = newSocket()
     ##    let sslContext = newContext( verifyMode = CVerifyNone )
     ##    sslContext.wrapSocket(socket)
-    ##    var stomp = newStompClient( socket, "stomp+ssl://test:test@example.com/%2Fvhost" )
+    ##    var stomp = newStompClient( socket, "stomp+ssl://test:test@example.com/vhost" )
     ##
 
     let
@@ -327,7 +338,10 @@ proc newStompClient*( s: Socket, uri: string ): StompClient =
     result.port = Port( port )
 
     # Decode URI encoded slashes for vhosts.
-    result.vhost = result.vhost.replace( "%2f", "/" ).replace( "%2F", "/" ).replace( "//", "/" )
+    result.vhost = result.vhost.
+        replace( "%2f", "/" ).
+        replace( "%2F", "/" ).
+        replace( "//", "/" )
 
 
 proc socksend( c: StompClient, data: string ): void =
@@ -437,7 +451,7 @@ proc send*( c: StompClient,
 
     if not c.connected: raise newException( StompError, "Client is not connected." )
     c.socksend( "SEND" & CRLF )
-    c.socksend( "destination:" & destination & CRLF )
+    c.socksend( "destination:" & destination.encode & CRLF )
     c.socksend( "content-length:" & $message.len & CRLF )
     if not ( contenttype == "" ): c.socksend( "content-type:" & contenttype & CRLF )
 
@@ -447,7 +461,7 @@ proc send*( c: StompClient,
     var txn_seen = false
     for header in headers:
         if header.name == "transaction": txn_seen = true
-        c.socksend( header.name & ":" & header.value & CRLF )
+        c.socksend( header.name & ":" & header.value.encode & CRLF )
     if not txn_seen: c.add_txn
 
     if message == "":
@@ -473,7 +487,7 @@ proc subscribe*( c: StompClient,
 
     if not c.connected: raise newException( StompError, "Client is not connected." )
     c.socksend( "SUBSCRIBE" & CRLF )
-    c.socksend( "destination:" & destination & CRLF )
+    c.socksend( "destination:" & destination.encode & CRLF )
 
     if id == "":
         c.socksend( "id:" & $c.subscriptions.len & CRLF )
@@ -486,7 +500,7 @@ proc subscribe*( c: StompClient,
         if ack != "auto": raise newException( StompError, "Unknown ack type: " & ack )
 
     for header in headers:
-        c.socksend( header.name & ":" & header.value & CRLF )
+        c.socksend( header.name & ":" & header.value.encode & CRLF )
     c.finmsg
     c.subscriptions.add( destination )
 
@@ -513,7 +527,7 @@ proc unsubscribe*( c: StompClient,
     c.socksend( "UNSUBSCRIBE" & CRLF )
     c.socksend( "id:" & $sub_id & CRLF )
     for header in headers:
-        c.socksend( header.name & ":" & header.value & CRLF )
+        c.socksend( header.name & ":" & header.value.encode & CRLF )
     c.finmsg
     c.subscriptions[ sub_id ] = ""
 
@@ -707,7 +721,9 @@ You can also run a naive benchmark (deliveries/sec):
 
 It will set messages to require acknowledgement, and nack everything, causing
 a delivery loop for 10 seconds.
-If your vhost requires slashes, use URI escaping: /%2Ftest
+
+With older version of RabbitMQ, If your vhost requires slashes, you'll
+need to URI escape: /%2Ftest
 """
 
 
@@ -751,8 +767,8 @@ If your vhost requires slashes, use URI escaping: /%2Ftest
                     of "RECEIPT":
                         discard
                     of "MESSAGE":
-                        let body = r.payload
-                        let id   = r[ "ack" ]
+                        discard r.payload
+                        discard r[ "ack" ]
 
             proc seen_heartbeat( c: StompClient, r: StompResponse ) =
                 heartbeats = heartbeats + 1
