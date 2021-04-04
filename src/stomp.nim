@@ -58,7 +58,7 @@ import
     uri
 
 const
-    VERSION = "0.1.2" ## The current program version.
+    VERSION = "0.1.3" ## The current program version.
     NULL    = "\x00"  ## The NULL character.
     CR      = "\r"    ## The carriage return character.
     CRLF    = "\r\n"  ## Carriage return + Line feed (EOL).
