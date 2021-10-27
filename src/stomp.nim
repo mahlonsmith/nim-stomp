@@ -50,12 +50,12 @@
 ##
 
 import
-    strutils,
-    nativesockets,
-    net,
-    os,
-    times,
-    uri
+    std/nativesockets,
+    std/net,
+    std/os,
+    std/strutils,
+    std/times,
+    std/uri
 
 const
     VERSION = "0.1.3" ## The current program version.
@@ -130,7 +130,7 @@ proc parse_headers( response: StompResponse, c: StompClient ): int =
 
     c.socket.readline( line, c.timeout )
     while not line.is_eol:
-        if defined( debug ): printf " <-- %s\n", line
+        if defined( debug ): printf " <-- %s\n", cstring(line)
         var header = line.split( ":" )
         if header.len < 2: break
         response.headers.add( (header[0], header[1]) )
@@ -206,7 +206,7 @@ proc newStompResponse( c: StompClient ): StompResponse =
     #
     result.frame = line
     if defined( debug ):
-        printf " <-- %s\n", line
+        printf " <-- %s\n", cstring(line)
 
     # Parse headers and body.
     #
@@ -319,7 +319,7 @@ proc newStompClient*( s: Socket, uri: string ): StompClient =
                     result.options.heartbeat = opt[1].parse_int
                 else:
                     discard
-        except IndexError, ValueError:
+        except IndexDefect, ValueError:
             discard
 
     # Set default STOMP port if otherwise unset.
@@ -763,12 +763,6 @@ need to URI escape: /%2Ftest
 
             proc receive_message( c: StompClient, r: StompResponse ) =
                 messages.add( r )
-                case r.frame:
-                    of "RECEIPT":
-                        discard
-                    of "MESSAGE":
-                        discard r.payload
-                        discard r[ "ack" ]
 
             proc seen_heartbeat( c: StompClient, r: StompResponse ) =
                 heartbeats = heartbeats + 1
