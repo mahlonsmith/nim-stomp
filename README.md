@@ -153,8 +153,7 @@ This is a complete client that does the following:
 # (This should be compiled with -d:ssl)
 
 import
-   json,
-   net,
+   std/[net,json],
    stomp
 
 let

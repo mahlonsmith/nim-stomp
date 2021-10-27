@@ -5,7 +5,7 @@ CACHE = .cache
 default: development
 
 development: ${FILES}
-	nim --debugInfo --assertions:on --linedir:on -d:ssl --define:debug --nimcache:${CACHE} c ${FILES}
+	nim --debugInfo --assertions:on --profiler:on --stackTrace:on --linedir:on -d:ssl --define:debug --nimcache:${CACHE} c ${FILES}
 	@mv src/stomp .
 
 autobuild:
@@ -16,7 +16,7 @@ debugger: ${FILES}
 	nim --debugger:on --nimcache:${CACHE} c ${FILES}
 
 release: ${FILES}
-	nim -d:release --opt:speed --nimcache:${CACHE} c ${FILES}
+	nim -d:release --opt:speed --panics:on --nimcache:${CACHE} c ${FILES}
 	@mv src/stomp .
 
 docs:
