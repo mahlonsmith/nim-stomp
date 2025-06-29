@@ -22,7 +22,7 @@ works for you with another broker, please let the author know.
 
 ### Installation ###
 
-The easiest way to install this module is via the nimble package manager, 
+The easiest way to install this module is via the nimble package manager,
 by simply running 'nimble install stomp'.
 
 Alternatively, you can fetch the 'stomp.nim' file yourself, and put it
@@ -70,8 +70,7 @@ by adding specific headers.  You can also add "x-headers" that are carried betwe
 Another use is to issue "receipts" on sends or subscriptions, to ensure the broker has
 processed your request.  Here's an example of how to perform receipt processing:
 
-```
-#!nimrod
+```nim
 proc accept_receipt( c: StompClient, r: StompResponse ) =
    var receipt = r[ "receipt-id" ]
    # ... match this receipt up to the request that generated it
@@ -99,8 +98,7 @@ With one open transaction, messages are automatically attached to it.
 If you have multiple open transactions, you'll need to add which one
 you want a message to be part of via the custom headers.
 
-```
-#!nimrod
+```nim
 # Single transaction
 #
 client.begin( "trans-1" )
@@ -148,8 +146,7 @@ This is a complete client that does the following:
   with JSON results to the **user.created** key -- presumably to be picked up by another
   process elsewhere.
 
-```
-#!nimrod
+```nim
 # (This should be compiled with -d:ssl)
 
 import
@@ -185,7 +182,7 @@ proc message( c: StompClient, r: StompResponse ) =
 
 	   # ... do the heavy lifting with the parsed data.
 	   # ... and assuming is was successful, ack and emit!
-	   
+
 	   c.ack( id )
 
 	   var message = %*{ "user": json["user"].getStr, "otherstuff": true }
@@ -209,4 +206,3 @@ client.subscribe( "/exchange/events/user.create", "client-individual" )
 # Enter message loop.
 client.wait_for_messages
 ```
-
